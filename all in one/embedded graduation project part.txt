@@ -1,0 +1,330 @@
+//main code of embedded graduation part
+	# Modules
+	import RPi.GPIO as GPIO
+	import time
+	from goto import *
+	from FAN_CODE import *
+	from TEMP_CODE import*
+	from FLAME_CODE import*
+	from LDR_CODE import *
+	from LED_CODE import *
+	from PIR_CODE import *
+	from SPEAKER_CODE import * 
+	from WP_CODE import *
+	from SERVO_CODE import*
+	from IR_CODE import *
+	import os
+
+	# fan
+	Input_pin=18
+	GPIO.setup(Input_pin, GPIO.IN) # input signal
+
+	#flame sensor
+	Light_Red = 31
+	GPIO.setup(Light_Red, GPIO.OUT)
+
+	#TEST
+	Input=7
+	GPIO.setup(Input, GPIO.IN) # input signal
+
+	#SERVO
+	open = 40                  
+	GPIO.setup(open, GPIO.IN)
+
+	#train detector
+	green_led=35
+	red_led=36
+	GPIO.setup(red_led, GPIO.OUT)
+	GPIO.setup(green_led, GPIO.OUT)
+
+
+
+	#Main function
+	def main () : 
+	#initialization
+	   FAN_int()
+	   FLAME_init() 
+	   LdrInit()
+	   LedInit()
+	   SPEAKER_int()
+	   PIR_Init()
+	   WP_int()
+	   SERVO_init() 
+	   IR_int()  
+	  
+	   while 1 :
+	   #fan code 
+		  test= GPIO.input(Input_pin)
+		  if (test  == True):
+		   FAN_ON() 
+		  else:
+		   FAN_OFF()
+		  
+	 #flame code 
+		  x= FLAME_Read()
+		  if (x == True ):
+		   GPIO.output(Light_Red,1)
+		   time.sleep(0.01)	 
+		  else:
+		   GPIO.output(Light_Red,0)
+		   time.sleep(0.01)
+		   
+	#LDR
+		   LDR_OUT =  LdrRead()
+		   if(LDR_OUT == 1 ):
+				LedOn()
+		   else:
+				LedOff()
+			
+	#PIR & SPEAKERS	
+		   y= PIR_Read()
+		   if (y== True ): 
+			SPEAKER_ON()
+		   else:
+			SPEAKER_OFF()
+	#TEMP
+		  temp_level = ReadChannel(temp_channel) 
+		  temp       = ConvertTemp(temp_level,2)
+	#WP
+		  test_data= GPIO.input(Input) 
+		  if (test_data == True):
+		   WP_ON()
+		  else:
+		   WP_OFF()
+		   
+	 #SERVO      
+		  if (GPIO.input(open) == True ) :
+		   SERVO_open () 
+		  else:
+		   SERVO_close ()
+		   
+	#Train detector 
+		  w= IR1_read()
+		  z=IR2_read()
+		  if ((w == 1 and z==0) or (w == 0 and z==1))  :
+		   GPIO.output(red_led,True)
+		   GPIO.output(green_led, False)
+		
+		  elif (w == 1 and z==1) :
+		   GPIO.output(green_led, True)
+		   GPIO.output(red_led, False)
+		
+		  else:
+		   GPIO.output(green_led, False)
+		   GPIO.output(red_led, False)
+
+______________________________________________________________________________________________________________
+
+//pin code
+	import RPi.GPIO as GPIO
+	temp_channel  = 0
+	Relay_pin= 11
+	SPEAKER=12
+	PIR_Sensor =13
+	LDR_pin = 15
+	Fan_pin= 16
+	Flame_Sensor = 22
+	first_IR=32
+	second_IR=33
+	Servo = 37
+	LED_pin = 38
+	
+_______________________________________________________________________________________________________________
+
+//TEMP_CODE
+	from PIN import*
+	import spidev
+	import RPi.GPIO as GPIO
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setwarnings(False)
+
+	# Open SPI bus
+	spi = spidev.SpiDev()
+	spi.open(0,0)
+
+	# Function to read SPI data from MCP3008 chip
+	# Channel must be an integer 0-7
+	def ReadChannel(channel):
+	  adc = spi.xfer2([1,(8+channel)<<4,0])
+	  data = ((adc[1]&3) << 8) + adc[2]
+	  return data
+	  
+	# Function to calculate temperature from
+	# TMP36 data, rounded to specified
+	# number of decimal places.
+	def ConvertTemp(data,places):
+	 
+	  # ADC Value
+	  # (approx)  Temp  Volts
+	  #    0      -50    0.00
+	  #   78      -25    0.25
+	  #  155        0    0.50
+	  #  233       25    0.75
+	  #  310       50    1.00
+	  #  465      100    1.50
+	  #  775      200    2.50
+	  # 1023      280    3.30
+	 
+	  temp = ((data * 330)/float(1023))
+	  temp = round(temp,places)
+	  return temp
+	  
+______________________________________________________________________________________________________________
+
+// IR_CODE
+	from PIN import *
+	import RPi.GPIO as GPIO
+
+	def IR_int():
+	   GPIO.setup(first_IR, GPIO.IN)
+	   GPIO.setup(second_IR, GPIO.IN)
+	   
+	def IR1_read():
+	   return GPIO.input(first_IR)
+	   
+	def IR2_read():
+	   return GPIO.input(second_IR)
+	   
+______________________________________________________________________________________________________________
+
+// FLAME_CODE
+	from PIN import*
+	import RPi.GPIO as GPIO
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setwarnings(False)
+
+	def FLAME_init() :
+	   GPIO.setup(Flame_Sensor, GPIO.IN)
+	   
+	def FLAME_Read() :
+	   return GPIO.input(Flame_Sensor)
+
+______________________________________________________________________________________________________________
+
+// SPEAKER_CODE
+	from PIN import *
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setwarnings(False)
+	import RPi.GPIO as GPIO
+
+	def SPEAKER_int():
+	   GPIO.setup(SPEAKER, GPIO.OUT) # Fan
+	   
+	def SPEAKER_ON():
+	   GPIO.output(SPEAKER, True)
+	   
+	def SPEAKER_OFF():
+	   GPIO.output(SPEAKER, False)
+
+______________________________________________________________________________________________________________
+
+//PIR_CODE
+	from PIN import *
+	import RPi.GPIO as GPIO
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setwarnings(False)
+
+	def PIR_Init() :
+	  
+		GPIO.setup(PIR_Sensor, GPIO.IN) 
+		
+		
+	def  PIR_Read() :
+		return GPIO.input(PIR_Sensor)
+
+______________________________________________________________________________________________________________
+
+//LED_CODE
+	import RPi.GPIO as GPIO
+	from PIN import *
+
+	GPIO.setmode(GPIO.BOARD)
+
+	def LedInit():    
+		   GPIO.setup(LED_pin, GPIO.OUT)
+		   
+		   
+	def LedOn():
+		  GPIO.output(LED_pin, True)
+	  
+	  
+	def LedOff():
+		  GPIO.output(LED_pin, False)
+		  
+______________________________________________________________________________________________________________
+
+//LDR_CODE
+	import RPi.GPIO as GPIO
+	from PIN import *
+
+	GPIO.setmode(GPIO.BOARD)
+	 
+	def LdrInit():
+	  GPIO.setup(LDR_pin, GPIO.IN)
+	 
+	 
+	def  LdrRead():
+	   LDR_OUT= GPIO.input(LDR_pin)
+	   return LDR_OUT
+	   
+______________________________________________________________________________________________________________
+
+// FAN_CODE
+	from PIN import *
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setwarnings(False)
+	import RPi.GPIO as GPIO
+
+	def FAN_int():
+	   GPIO.setup(Fan_pin, GPIO.OUT) # Fan
+	   
+	def FAN_ON():
+	   GPIO.output(Fan_pin, True)
+	   
+	def FAN_OFF():
+	   GPIO.output(Fan_pin, False)
+	   
+______________________________________________________________________________________________________________
+
+//SERVO_CODE
+	from PIN import*
+	import time 
+	import RPi.GPIO as GPIO  
+	GPIO.setmode(GPIO.BOARD)
+
+	def SERVO_init():
+	   GPIO.setup(Servo , GPIO.OUT)
+	  
+
+	def SERVO_open ():
+	   pwm=GPIO.PWM(Servo ,100)                        ## PWM Frequency
+	   pwm.start(5)
+	   ck=0
+	   duty= float(170)/10 + 2.5
+	   pwm.ChangeDutyCycle(duty)
+	   time.sleep(0.1)
+	   ck=ck+1
+
+	def SERVO_close ():
+	   pwm=GPIO.PWM(Servo ,100)                        ## PWM Frequency
+	   pwm.start(5)
+	   ck=0
+	   duty= float(0)/10 + 2 
+	   pwm.ChangeDutyCycle(duty)
+	   time.sleep(0.1)
+	   ck=ck+1   
+	   
+______________________________________________________________________________________________________________
+
+// WP_CODE
+	from PIN import *
+	import RPi.GPIO as GPIO
+
+	def WP_int():
+	   GPIO.setup(Relay_pin, GPIO.OUT) # Motor_1
+	   
+	def WP_ON():
+	   GPIO.output(Relay_pin, True)
+	   
+	def WP_OFF():
+	   GPIO.output(Relay_pin, False)
